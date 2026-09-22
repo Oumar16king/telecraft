@@ -37,6 +37,8 @@ export async function openRouterChat(
             messages,
             ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
           }),
+          // A stuck free model should hand over to the next one instead of hanging.
+          signal: AbortSignal.timeout(120_000),
         });
         const payload = (await response.json()) as {
           choices?: { message?: { content?: string } }[];
