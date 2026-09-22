@@ -261,9 +261,6 @@ function Dashboard() {
 export function TopBar() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  useEffect(() => {
-    if (!user) return;
-  }, [user]);
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
