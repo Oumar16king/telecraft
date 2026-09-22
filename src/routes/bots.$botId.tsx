@@ -17,12 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TopBar } from "./index";
-import {
-  describeAction,
-  describeTrigger,
-  normalizeSpec,
-  type BotSpec,
-} from "@/lib/bot-spec";
+import { describeAction, describeTrigger, normalizeSpec, type BotSpec } from "@/lib/bot-spec";
 import {
   buildBotLogic,
   connectTelegram,
@@ -61,11 +56,7 @@ function Studio() {
   const { data: bot } = useQuery({
     queryKey: ["bot", botId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("bots")
-        .select("*")
-        .eq("id", botId)
-        .maybeSingle();
+      const { data, error } = await supabase.from("bots").select("*").eq("id", botId).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -284,9 +275,7 @@ function LogicPreview({ spec }: { spec: BotSpec }) {
       {spec.handlers.map((handler) => (
         <div key={handler.id} className="rounded-xl border border-border p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-display text-sm font-semibold">
-              {handler.label ?? handler.id}
-            </p>
+            <p className="font-display text-sm font-semibold">{handler.label ?? handler.id}</p>
             <code className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {describeTrigger(handler.trigger)}
             </code>

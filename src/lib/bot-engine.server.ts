@@ -46,7 +46,11 @@ function args(text: string): string {
   return parts.slice(1).join(" ");
 }
 
-function render(template: string, msg: IncomingMessage, extra: Record<string, string> = {}): string {
+function render(
+  template: string,
+  msg: IncomingMessage,
+  extra: Record<string, string> = {},
+): string {
   const vars: Record<string, string> = {
     text: msg.text,
     args: args(msg.text),
@@ -79,8 +83,7 @@ function calculate(expression: string): string {
   try {
     // eslint-disable-next-line no-new-func
     const value = new Function(`"use strict"; return (${cleaned.replace(/\^/g, "**")});`)() as
-      | number
-      | undefined;
+      number | undefined;
     if (typeof value !== "number" || !Number.isFinite(value)) return "Calcul impossible.";
     return `${cleaned} = ${Math.round(value * 1e10) / 1e10}`;
   } catch {
@@ -163,7 +166,8 @@ async function runAction(
       }
       const response = await fetch(url, init);
       const raw = (await response.text()).slice(0, 6000);
-      if (!response.ok) return `Le service externe a répondu ${response.status} : ${raw.slice(0, 200)}`;
+      if (!response.ok)
+        return `Le service externe a répondu ${response.status} : ${raw.slice(0, 200)}`;
       if (!action.format) return raw.slice(0, 3500);
       return await callAi(
         `${render(action.format, msg)}\nRéponds en texte court, prêt à envoyer sur Telegram.`,

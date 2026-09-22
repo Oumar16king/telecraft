@@ -68,8 +68,8 @@ function Landing() {
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
           Colle ton token BotFather, discute en langage naturel, et la plateforme exécute la logique
-          de ton bot pour toi. Calculatrice, météo, prédictions, modération de groupe, quiz, support —
-          pas seulement des chatbots.
+          de ton bot pour toi. Calculatrice, météo, prédictions, modération de groupe, quiz, support
+          — pas seulement des chatbots.
         </p>
         <div className="mt-9 flex flex-wrap gap-3">
           <Link

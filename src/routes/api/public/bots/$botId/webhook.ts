@@ -41,11 +41,7 @@ export const Route = createFileRoute("/api/public/bots/$botId/webhook")({
         const secrets = Object.fromEntries((secretRows ?? []).map((s) => [s.key, s.value]));
 
         const { runBot } = await import("@/lib/bot-engine.server");
-        const result = await runBot(
-          bot.spec,
-          { text, firstName, chatId: String(chatId) },
-          secrets,
-        );
+        const result = await runBot(bot.spec, { text, firstName, chatId: String(chatId) }, secrets);
 
         if (bot.telegram_token && result.text) {
           const payload: Record<string, unknown> = {
@@ -58,11 +54,14 @@ export const Route = createFileRoute("/api/public/bots/$botId/webhook")({
               resize_keyboard: true,
             };
           }
-          const sent = await fetch(`https://api.telegram.org/bot${bot.telegram_token}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const sent = await fetch(
+            `https://api.telegram.org/bot${bot.telegram_token}/sendMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            },
+          );
           if (!sent.ok) console.error(`sendMessage failed [${sent.status}]: ${await sent.text()}`);
         }
 

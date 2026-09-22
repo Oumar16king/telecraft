@@ -75,7 +75,9 @@ async function chat(messages: { role: string; content: string }[]): Promise<stri
     const detail = await response.text();
     if (response.status === 429) throw new Error("Trop de requêtes IA, réessaie dans un instant.");
     if (response.status === 402)
-      throw new Error("Crédits IA épuisés pour cet espace de travail. Ajoute des crédits pour continuer.");
+      throw new Error(
+        "Crédits IA épuisés pour cet espace de travail. Ajoute des crédits pour continuer.",
+      );
     throw new Error(`IA indisponible [${response.status}] ${detail.slice(0, 300)}`);
   }
   const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
@@ -189,7 +191,9 @@ function publicOrigin(): string {
   const host = url.host
     .replace(/^id-preview--/, "project--")
     .replace(/^([^.]+)\.lovable\.app$/, (_m, sub: string) =>
-      sub.startsWith("project--") && !sub.endsWith("-dev") ? `${sub}-dev.lovable.app` : `${sub}.lovable.app`,
+      sub.startsWith("project--") && !sub.endsWith("-dev")
+        ? `${sub}-dev.lovable.app`
+        : `${sub}.lovable.app`,
     );
   return `https://${host}`;
 }
@@ -228,7 +232,8 @@ export const connectTelegram = createServerFn({ method: "POST" })
       }),
     });
     const hook = (await hookResponse.json()) as { ok: boolean; description?: string };
-    if (!hook.ok) throw new Error(`Telegram a refusé le webhook : ${hook.description ?? "inconnu"}`);
+    if (!hook.ok)
+      throw new Error(`Telegram a refusé le webhook : ${hook.description ?? "inconnu"}`);
 
     await supabase
       .from("bots")
@@ -252,7 +257,9 @@ export const disconnectTelegram = createServerFn({ method: "POST" })
       .eq("id", data.botId)
       .maybeSingle<BotRow>();
     if (!bot?.telegram_token) throw new Error("Bot introuvable.");
-    await fetch(`https://api.telegram.org/bot${bot.telegram_token}/deleteWebhook`, { method: "POST" });
+    await fetch(`https://api.telegram.org/bot${bot.telegram_token}/deleteWebhook`, {
+      method: "POST",
+    });
     await supabase.from("bots").update({ webhook_status: "inactive" }).eq("id", bot.id);
     return { ok: true };
   });
