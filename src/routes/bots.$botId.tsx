@@ -139,7 +139,11 @@ function Studio() {
             {tab === "secrets" && <Secrets botId={botId} spec={spec} />}
             {tab === "connection" && (
               <Connection
-                bot={{ id: bot.id, telegram_token: bot.telegram_token, webhook_status: bot.webhook_status }}
+                bot={{
+                  id: bot.id,
+                  telegram_token: bot.telegram_token,
+                  webhook_status: bot.webhook_status,
+                }}
               />
             )}
             {tab === "logs" && <Logs botId={botId} />}
@@ -306,7 +310,9 @@ function Versions({ botId }: { botId: string }) {
   });
 
   if (!versions?.length) {
-    return <p className="text-sm text-muted-foreground">Aucune version enregistrée pour l'instant.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Aucune version enregistrée pour l'instant.</p>
+    );
   }
 
   return (
@@ -391,8 +397,7 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
     <div className="space-y-4 text-sm">
       {!!spec.requiredSecrets?.length && (
         <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-          Clés attendues par la logique :{" "}
-          {spec.requiredSecrets.map((s) => s.key).join(", ")}
+          Clés attendues par la logique : {spec.requiredSecrets.map((s) => s.key).join(", ")}
         </div>
       )}
 

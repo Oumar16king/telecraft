@@ -18,7 +18,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Telecraft — Crée ton bot Telegram en discutant" },
       {
         property: "og:description",
-        content: "Décris ton bot, Telecraft l'écrit et le met en ligne. Chaque version est restaurable.",
+        content:
+          "Décris ton bot, Telecraft l'écrit et le met en ligne. Chaque version est restaurable.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -187,11 +188,7 @@ function Dashboard() {
                 key={bot.id}
                 className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
               >
-                <Link
-                  to="/bots/$botId"
-                  params={{ botId: bot.id }}
-                  className="min-w-0 flex-1"
-                >
+                <Link to="/bots/$botId" params={{ botId: bot.id }} className="min-w-0 flex-1">
                   <p className="truncate font-medium">{bot.name}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {bot.bot_username ? `@${bot.bot_username} · ` : ""}
