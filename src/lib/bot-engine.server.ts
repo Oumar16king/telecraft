@@ -183,6 +183,12 @@ export async function runBot(
 ): Promise<EngineResult> {
   const spec = normalizeSpec(specInput);
   const isStart = msg.text.trim().toLowerCase().startsWith("/start");
+  const hasStartHandler = spec.handlers.some(
+    (h) => h.trigger?.type === "command" && h.trigger.value.replace(/^\//, "") === "start",
+  );
+  if (isStart && !hasStartHandler && spec.welcome) {
+    return { text: render(spec.welcome, msg), handler: "welcome" };
+  }
   const handler = pickHandler(spec, msg.text);
 
   if (!handler) {
