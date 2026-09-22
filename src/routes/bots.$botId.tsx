@@ -28,13 +28,13 @@ import {
 export const Route = createFileRoute("/bots/$botId")({
   head: () => ({
     meta: [
-      { title: "Studio du bot — BotForge Studio" },
+      { title: "Studio du bot — Telecraft" },
       {
         name: "description",
         content:
           "Construis la logique de ton bot Telegram en langage naturel, teste-la dans le simulateur et gère ses clés.",
       },
-      { property: "og:title", content: "Studio du bot — BotForge Studio" },
+      { property: "og:title", content: "Studio du bot — Telecraft" },
       {
         property: "og:description",
         content: "Vibe coding, simulateur de chat Telegram et gestion des secrets pour ton bot.",

@@ -78,19 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "BotForge Studio" },
+      { title: "Telecraft" },
       {
         name: "description",
         content: "Studio de vibe coding pour créer et faire vivre des bots Telegram.",
       },
-      { property: "og:title", content: "BotForge Studio" },
+      { property: "og:title", content: "Telecraft" },
       {
         property: "og:description",
         content: "Studio de vibe coding pour créer et faire vivre des bots Telegram.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

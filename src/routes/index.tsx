@@ -9,13 +9,13 @@ import { useAuth } from "@/hooks/useAuth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BotForge Studio — Vibe coding pour bots Telegram" },
+      { title: "Telecraft — Vibe coding pour bots Telegram" },
       {
         name: "description",
         content:
           "Crée n'importe quel bot Telegram en langage naturel : calcul, météo, prédiction, gestion de groupe. Ton token BotFather, tes clés, exécution hébergée sans VPS.",
       },
-      { property: "og:title", content: "BotForge Studio — Vibe coding pour bots Telegram" },
+      { property: "og:title", content: "Telecraft — Vibe coding pour bots Telegram" },
       {
         property: "og:description",
         content:
@@ -48,7 +48,7 @@ function Landing() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_50%_0%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent)]" />
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2 font-display text-lg font-semibold">
-          <Bot className="size-5 text-primary" /> BotForge Studio
+          <Bot className="size-5 text-primary" /> Telecraft
         </div>
         <Link
           to="/auth"
@@ -266,7 +266,7 @@ export function TopBar() {
     <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center gap-2 font-display font-semibold">
-          <Bot className="size-5 text-primary" /> BotForge Studio
+          <Bot className="size-5 text-primary" /> Telecraft
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <span className="hidden text-muted-foreground sm:inline">{user?.email}</span>
