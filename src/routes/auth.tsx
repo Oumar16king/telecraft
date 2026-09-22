@@ -9,13 +9,13 @@ import { Bot } from "lucide-react";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Connexion — BotForge Studio" },
+      { title: "Connexion — Telecraft" },
       {
         name: "description",
         content:
-          "Connecte-toi à BotForge Studio pour créer tes bots Telegram en langage naturel, avec tes propres tokens.",
+          "Connecte-toi à Telecraft pour créer tes bots Telegram en langage naturel, avec tes propres tokens.",
       },
-      { property: "og:title", content: "Connexion — BotForge Studio" },
+      { property: "og:title", content: "Connexion — Telecraft" },
       {
         property: "og:description",
         content: "Crée et fais vivre tes bots Telegram en discutant avec l'IA.",
@@ -77,7 +77,7 @@ function AuthPage() {
             <Bot className="size-6" />
           </span>
           <div>
-            <p className="font-display text-lg font-semibold">BotForge Studio</p>
+            <p className="font-display text-lg font-semibold">Telecraft</p>
             <p className="text-sm text-muted-foreground">Vibe coding pour bots Telegram</p>
           </div>
         </div>
