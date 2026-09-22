@@ -96,6 +96,44 @@ export type Database = {
           },
         ]
       }
+      bot_versions: {
+        Row: {
+          bot_id: string
+          created_at: string
+          id: string
+          label: string | null
+          spec: Json
+          user_id: string
+          version: number
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          spec?: Json
+          user_id: string
+          version: number
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          spec?: Json
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_versions_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bots: {
         Row: {
           bot_username: string | null
