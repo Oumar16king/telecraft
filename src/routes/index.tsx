@@ -38,14 +38,7 @@ type BotRow = {
 };
 
 function Home() {
-  const { session, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">
-        Chargement…
-      </div>
-    );
-  }
+  const { session } = useAuth();
   return session ? <Dashboard /> : <Landing />;
 }
 

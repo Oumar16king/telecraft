@@ -11,11 +11,17 @@ export function useAuth() {
       setSession(next);
       setLoading(false);
     });
-    supabase.auth.getSession().then(({ data: { session: current } }) => {
-      setSession(current);
-      setLoading(false);
-    });
-    return () => data.subscription.unsubscribe();
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: current } }) => {
+        setSession(current);
+      })
+      .finally(() => setLoading(false));
+    const timer = setTimeout(() => setLoading(false), 2500);
+    return () => {
+      clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   return { session, user: session?.user ?? null, loading };
