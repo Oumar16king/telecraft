@@ -2,42 +2,42 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
 import {
   ArrowLeft,
+  Bot,
   Copy,
-  Key,
+  History,
+  KeyRound,
   Link2,
-  Loader2,
-  Play,
-  Radio,
+  ListTree,
+  MessageSquare,
+  RotateCcw,
   Send,
-  Sparkles,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { TopBar } from "./index";
-import { describeAction, describeTrigger, normalizeSpec, type BotSpec } from "@/lib/bot-spec";
 import {
-  buildBotLogic,
   connectTelegram,
   disconnectTelegram,
-  simulateMessage,
+  restoreVersion,
+  sendStudioMessage,
 } from "@/lib/studio.functions";
+import { describeAction, describeTrigger, normalizeSpec, type BotSpec } from "@/lib/bot-spec";
 
 export const Route = createFileRoute("/bots/$botId")({
   head: () => ({
     meta: [
-      { title: "Studio du bot — Telecraft" },
+      { title: "Studio — Telecraft" },
       {
         name: "description",
         content:
-          "Construis la logique de ton bot Telegram en langage naturel, teste-la dans le simulateur et gère ses clés.",
+          "Discute avec l'IA pour construire la logique de ton bot Telegram, gère tes clés, mets-le en ligne et restaure n'importe quelle version.",
       },
-      { property: "og:title", content: "Studio du bot — Telecraft" },
+      { property: "og:title", content: "Studio — Telecraft" },
       {
         property: "og:description",
-        content: "Vibe coding, simulateur de chat Telegram et gestion des secrets pour ton bot.",
+        content: "Construis ton bot Telegram en discutant, avec historique des versions.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -46,109 +46,113 @@ export const Route = createFileRoute("/bots/$botId")({
   component: Studio,
 });
 
-type Tab = "logic" | "simulator" | "secrets" | "connection" | "logs";
+type Tab = "logic" | "versions" | "secrets" | "connection" | "logs";
+
+const TABS: { id: Tab; label: string; icon: typeof ListTree }[] = [
+  { id: "logic", label: "Logique", icon: ListTree },
+  { id: "versions", label: "Versions", icon: History },
+  { id: "secrets", label: "Clés", icon: KeyRound },
+  { id: "connection", label: "Connexion", icon: Link2 },
+  { id: "logs", label: "Journal", icon: MessageSquare },
+];
 
 function Studio() {
   const { botId } = Route.useParams();
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("simulator");
+  const [tab, setTab] = useState<Tab>("logic");
 
-  const { data: bot } = useQuery({
+  const { data: bot, isLoading } = useQuery({
     queryKey: ["bot", botId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("bots").select("*").eq("id", botId).maybeSingle();
+      const { data, error } = await supabase
+        .from("bots")
+        .select("id, name, description, bot_username, webhook_status, telegram_token, spec")
+        .eq("id", botId)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
   });
 
-  const spec: BotSpec = normalizeSpec(bot?.spec);
-
+  if (isLoading) {
+    return <p className="p-10 text-sm text-muted-foreground">Chargement…</p>;
+  }
   if (!bot) {
     return (
-      <div className="min-h-screen bg-background">
-        <TopBar />
-        <p className="p-10 text-sm text-muted-foreground">Chargement du bot…</p>
+      <div className="p-10">
+        <p className="text-sm text-muted-foreground">Bot introuvable.</p>
+        <Link to="/" className="mt-3 inline-block text-sm text-primary">
+          Retour
+        </Link>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <TopBar />
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Tous mes bots
-        </Link>
+  const spec = normalizeSpec(bot.spec);
 
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-semibold">{bot.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {bot.description ?? "Pas de description"}
+  return (
+    <div className="min-h-screen">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
+          <Link
+            to="/"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+            aria-label="Retour"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
+          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <Bot className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{bot.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {bot.bot_username ? `@${bot.bot_username} · ` : ""}
+              {bot.webhook_status === "active" ? "En ligne" : "Hors ligne"}
             </p>
           </div>
-          <span
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
-              bot.webhook_status === "active"
-                ? "bg-primary/15 text-primary"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            <Radio className="size-3.5" />
-            {bot.webhook_status === "active"
-              ? `En ligne${bot.bot_username ? ` · @${bot.bot_username}` : ""}`
-              : "Hors ligne"}
-          </span>
         </div>
+      </header>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <VibeChat botId={botId} onBuilt={() => queryClient.invalidateQueries()} />
+      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[1fr_380px]">
+        <VibeChat botId={botId} />
 
-          <section className="rounded-2xl border border-border bg-card">
-            <nav className="flex flex-wrap gap-1 border-b border-border p-2 text-sm">
-              {(
-                [
-                  ["simulator", "Simulateur"],
-                  ["logic", "Logique"],
-                  ["secrets", "Clés"],
-                  ["connection", "Connexion"],
-                  ["logs", "Journal"],
-                ] as [Tab, string][]
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => setTab(value)}
-                  className={`rounded-lg px-3 py-1.5 transition ${
-                    tab === value
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:bg-accent"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <div className="p-4">
-              {tab === "simulator" && <Simulator botId={botId} />}
-              {tab === "logic" && <LogicPreview spec={spec} />}
-              {tab === "secrets" && <Secrets botId={botId} spec={spec} />}
-              {tab === "connection" && <Connection bot={bot} />}
-              {tab === "logs" && <Logs botId={botId} />}
-            </div>
-          </section>
-        </div>
+        <section className="rounded-2xl border border-border bg-card">
+          <div className="flex flex-wrap gap-1 border-b border-border p-2">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ${
+                  tab === id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="p-4">
+            {tab === "logic" && <LogicPreview spec={spec} />}
+            {tab === "versions" && <Versions botId={botId} />}
+            {tab === "secrets" && <Secrets botId={botId} spec={spec} />}
+            {tab === "connection" && (
+              <Connection
+                bot={{ id: bot.id, telegram_token: bot.telegram_token, webhook_status: bot.webhook_status }}
+              />
+            )}
+            {tab === "logs" && <Logs botId={botId} />}
+          </div>
+        </section>
       </main>
     </div>
   );
 }
 
-function VibeChat({ botId, onBuilt }: { botId: string; onBuilt: () => void }) {
-  const build = useServerFn(buildBotLogic);
+function VibeChat({ botId }: { botId: string }) {
   const queryClient = useQueryClient();
+  const send = useServerFn(sendStudioMessage);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -169,185 +173,169 @@ function VibeChat({ botId, onBuilt }: { botId: string; onBuilt: () => void }) {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages?.length]);
 
-  const send = useMutation({
-    mutationFn: async (message: string) => await build({ data: { botId, message } }),
-    onSuccess: () => {
-      setInput("");
-      queryClient.invalidateQueries({ queryKey: ["studio", botId] });
-      queryClient.invalidateQueries({ queryKey: ["bot", botId] });
-      onBuilt();
+  const ask = useMutation({
+    mutationFn: async (message: string) => await send({ data: { botId, message } }),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["studio", botId] });
+      if (result.mode === "build") {
+        void queryClient.invalidateQueries({ queryKey: ["bot", botId] });
+        void queryClient.invalidateQueries({ queryKey: ["versions", botId] });
+        toast.success("Logique mise à jour");
+      }
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "L'IA n'a pas pu construire la logique"),
+    onError: (error: Error) => toast.error(error.message),
   });
+
+  const submit = () => {
+    const message = input.trim();
+    if (!message || ask.isPending) return;
+    setInput("");
+    ask.mutate(message);
+  };
 
   return (
     <section className="flex min-h-[560px] flex-col rounded-2xl border border-border bg-card">
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <Sparkles className="size-4 text-primary" />
-        <p className="font-display text-sm font-semibold">Studio · décris ton bot</p>
-      </header>
-
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-5">
         {!messages?.length && (
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>Exemples de demandes :</p>
-            <ul className="space-y-2">
-              {[
-                "Fais un bot calculatrice : /calc 12*(3+4) et il répond le résultat.",
-                "Bot météo : /meteo Paris via l'API OpenWeather avec ma clé OPENWEATHER_KEY.",
-                "Bot de prédiction fun : /predire donne une prédiction du jour au hasard.",
-                "Bot d'accueil de groupe avec règles et boutons.",
-              ].map((example) => (
-                <li key={example}>
-                  <button
-                    onClick={() => setInput(example)}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-left hover:border-primary/50 hover:text-foreground"
-                  >
-                    {example}
-                  </button>
-                </li>
-              ))}
-            </ul>
+          <div className="rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+            Décris ce que ton bot doit faire. Exemples : « Quand on écrit /meteo Paris, donne la
+            météo », « Ajoute un quiz de 3 questions », « Réponds bonjour au /start ». Tu peux aussi
+            poser une simple question.
           </div>
         )}
-        {messages?.map((message) => (
+        {messages?.map((m) => (
           <div
-            key={message.id}
-            className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-              message.role === "user"
+            key={m.id}
+            className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm whitespace-pre-wrap ${
+              m.role === "user"
                 ? "ml-auto bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground"
+                : "bg-muted text-foreground"
             }`}
           >
-            {message.content}
+            {m.content}
           </div>
         ))}
-        {send.isPending && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Construction de la logique…
-          </p>
+        {ask.isPending && (
+          <div className="max-w-[85%] rounded-xl bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">
+            Je réfléchis…
+          </div>
         )}
         <div ref={endRef} />
       </div>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (input.trim()) send.mutate(input.trim());
-        }}
-        className="flex gap-2 border-t border-border p-3"
-      >
-        <input
+      <div className="flex items-end gap-2 border-t border-border p-3">
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ex : ajoute /horaires qui renvoie nos horaires d'ouverture"
-          className="flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          rows={2}
+          placeholder="Écris à l'IA…"
+          className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
         />
         <button
-          type="submit"
-          disabled={send.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          onClick={submit}
+          disabled={!input.trim() || ask.isPending}
+          className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          aria-label="Envoyer"
         >
           <Send className="size-4" />
         </button>
-      </form>
+      </div>
     </section>
   );
 }
 
 function LogicPreview({ spec }: { spec: BotSpec }) {
-  if (!spec.handlers.length) {
+  if (!spec.handlers.length && !spec.welcome) {
     return (
       <p className="text-sm text-muted-foreground">
-        Aucune logique pour l'instant. Décris ton bot dans le studio.
+        Rien encore. Explique à l'IA ce que ton bot doit faire.
       </p>
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-sm">
       {spec.welcome && (
-        <div className="rounded-xl border border-border p-3">
+        <div className="rounded-lg border border-border p-3">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">/start</p>
-          <p className="mt-1 text-sm">{spec.welcome}</p>
+          <p className="mt-1 whitespace-pre-wrap">{spec.welcome}</p>
         </div>
       )}
-      {spec.handlers.map((handler) => (
-        <div key={handler.id} className="rounded-xl border border-border p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-display text-sm font-semibold">{handler.label ?? handler.id}</p>
-            <code className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {describeTrigger(handler.trigger)}
-            </code>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{describeAction(handler.action)}</p>
+      {spec.handlers.map((handler, index) => (
+        <div key={handler.id || index} className="rounded-lg border border-border p-3">
+          <p className="font-medium">{handler.label || handler.id || `Règle ${index + 1}`}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {describeTrigger(handler.trigger)} → {describeAction(handler.action)}
+          </p>
         </div>
       ))}
     </div>
   );
 }
 
-function Simulator({ botId }: { botId: string }) {
-  const simulate = useServerFn(simulateMessage);
-  const [text, setText] = useState("/start");
-  const [thread, setThread] = useState<{ from: "user" | "bot"; text: string }[]>([]);
+function Versions({ botId }: { botId: string }) {
+  const queryClient = useQueryClient();
+  const restore = useServerFn(restoreVersion);
 
-  const run = useMutation({
-    mutationFn: async (message: string) => await simulate({ data: { botId, text: message } }),
-    onMutate: (message) => setThread((prev) => [...prev, { from: "user", text: message }]),
-    onSuccess: (result) => setThread((prev) => [...prev, { from: "bot", text: result.text }]),
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Le simulateur a échoué"),
+  const { data: versions } = useQuery({
+    queryKey: ["versions", botId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bot_versions")
+        .select("id, version, label, created_at")
+        .eq("bot_id", botId)
+        .order("version", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
+  const apply = useMutation({
+    mutationFn: async (versionId: string) => await restore({ data: { botId, versionId } }),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["bot", botId] });
+      void queryClient.invalidateQueries({ queryKey: ["versions", botId] });
+      toast.success(`Version ${result.version} restaurée`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  if (!versions?.length) {
+    return <p className="text-sm text-muted-foreground">Aucune version enregistrée pour l'instant.</p>;
+  }
+
   return (
-    <div>
-      <div className="h-[380px] space-y-2 overflow-y-auto rounded-xl bg-[color-mix(in_oklch,var(--primary)_8%,var(--background))] p-3">
-        {!thread.length && (
-          <p className="pt-24 text-center text-sm text-muted-foreground">
-            Faux chat Telegram : envoie un message pour tester ton bot.
-          </p>
-        )}
-        {thread.map((message, index) => (
-          <div
-            key={index}
-            className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
-              message.from === "user"
-                ? "ml-auto rounded-br-sm bg-primary text-primary-foreground"
-                : "rounded-bl-sm bg-card text-card-foreground"
-            }`}
-          >
-            {message.text}
+    <ul className="max-h-[420px] space-y-2 overflow-y-auto text-sm">
+      {versions.map((v, index) => (
+        <li key={v.id} className="rounded-lg border border-border p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-medium">
+                Version {v.version}
+                {index === 0 ? " · actuelle" : ""}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {v.label ?? "—"} · {new Date(v.created_at).toLocaleString("fr-FR")}
+              </p>
+            </div>
+            {index !== 0 && (
+              <button
+                onClick={() => apply.mutate(v.id)}
+                disabled={apply.isPending}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs hover:bg-accent disabled:opacity-60"
+              >
+                <RotateCcw className="size-3.5" /> Restaurer
+              </button>
+            )}
           </div>
-        ))}
-        {run.isPending && (
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" /> le bot écrit…
-          </p>
-        )}
-      </div>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (text.trim()) run.mutate(text.trim());
-        }}
-        className="mt-3 flex gap-2"
-      >
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-          placeholder="/start"
-        />
-        <button
-          type="submit"
-          disabled={run.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-        >
-          <Play className="size-4" />
-        </button>
-      </form>
-    </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -363,7 +351,7 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
         .from("bot_secrets")
         .select("id, key")
         .eq("bot_id", botId)
-        .order("created_at");
+        .order("key");
       if (error) throw error;
       return data ?? [];
     },
@@ -373,11 +361,11 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
     mutationFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) throw new Error("Session expirée");
+      if (!userId) throw new Error("Session expirée.");
       const { error } = await supabase
         .from("bot_secrets")
         .upsert(
-          { bot_id: botId, user_id: userId, key: key.trim().toUpperCase(), value: value.trim() },
+          { bot_id: botId, user_id: userId, key: key.trim(), value: value.trim() },
           { onConflict: "bot_id,key" },
         );
       if (error) throw error;
@@ -385,10 +373,10 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
     onSuccess: () => {
       setKey("");
       setValue("");
-      queryClient.invalidateQueries({ queryKey: ["secrets", botId] });
+      void queryClient.invalidateQueries({ queryKey: ["secrets", botId] });
       toast.success("Clé enregistrée");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Échec"),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const remove = useMutation({
@@ -396,67 +384,58 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
       const { error } = await supabase.from("bot_secrets").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["secrets", botId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["secrets", botId] }),
   });
 
   return (
-    <div className="space-y-4">
-      {spec.requiredSecrets?.length ? (
-        <div className="rounded-xl border border-border p-3 text-sm">
-          <p className="font-medium">Clés attendues par ce bot</p>
-          <ul className="mt-2 space-y-1 text-muted-foreground">
-            {spec.requiredSecrets.map((secret) => (
-              <li key={secret.key}>
-                <code className="text-foreground">{secret.key}</code> — {secret.description}
-              </li>
-            ))}
-          </ul>
+    <div className="space-y-4 text-sm">
+      {!!spec.requiredSecrets?.length && (
+        <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+          Clés attendues par la logique :{" "}
+          {spec.requiredSecrets.map((s) => s.key).join(", ")}
         </div>
-      ) : null}
-
-      <div className="space-y-2">
-        <input
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder="NOM_DE_LA_CLE"
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          type="password"
-          placeholder="Valeur de la clé"
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        <button
-          onClick={() => save.mutate()}
-          disabled={!key.trim() || !value.trim() || save.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-        >
-          <Key className="size-4" /> Enregistrer
-        </button>
-      </div>
+      )}
 
       <ul className="space-y-2">
         {secrets?.map((secret) => (
           <li
             key={secret.id}
-            className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+            className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
           >
-            <code>{secret.key}</code>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>••••••••</span>
-              <button
-                onClick={() => remove.mutate(secret.id)}
-                className="rounded p-1 hover:bg-destructive/15 hover:text-destructive"
-                aria-label="Supprimer la clé"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </div>
+            <code className="text-xs">{secret.key}</code>
+            <button
+              onClick={() => remove.mutate(secret.id)}
+              className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-destructive"
+              aria-label="Supprimer la clé"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </li>
         ))}
       </ul>
+
+      <div className="space-y-2">
+        <input
+          value={key}
+          onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+          placeholder="NOM_DE_LA_CLE"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+        />
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          type="password"
+          placeholder="valeur"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+        />
+        <button
+          onClick={() => save.mutate()}
+          disabled={!key.trim() || !value.trim() || save.isPending}
+          className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+        >
+          Enregistrer la clé
+        </button>
+      </div>
     </div>
   );
 }
@@ -464,7 +443,7 @@ function Secrets({ botId, spec }: { botId: string; spec: BotSpec }) {
 function Connection({
   bot,
 }: {
-  bot: { id: string; telegram_token: string | null; webhook_status: string };
+  bot: { id: string; telegram_token: string | null; webhook_status: string | null };
 }) {
   const queryClient = useQueryClient();
   const connect = useServerFn(connectTelegram);
@@ -480,38 +459,34 @@ function Connection({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
+      void queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
       toast.success("Token enregistré");
     },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const activate = useMutation({
     mutationFn: async () => await connect({ data: { botId: bot.id } }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
-      toast.success(
-        result.username ? `@${result.username} est en ligne` : "Bot connecté à Telegram",
-      );
+      void queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
+      toast.success(result.username ? `@${result.username} est en ligne` : "Bot en ligne");
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Activation impossible"),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const stop = useMutation({
     mutationFn: async () => await disconnect({ data: { botId: bot.id } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
+      void queryClient.invalidateQueries({ queryKey: ["bot", bot.id] });
       toast.success("Bot mis hors ligne");
     },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   return (
     <div className="space-y-4 text-sm">
       <div>
         <p className="font-medium">Token BotFather</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Crée un bot avec @BotFather sur Telegram et colle ici le token qu'il te donne.
-        </p>
         <input
           value={token}
           onChange={(e) => setToken(e.target.value)}
@@ -546,7 +521,7 @@ function Connection({
         )}
       </div>
 
-      <div className="rounded-xl border border-border p-3">
+      <div className="rounded-lg border border-border p-3">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">Adresse webhook</p>
         <div className="mt-1 flex items-center gap-2">
           <code className="flex-1 break-all text-xs">/api/public/bots/{bot.id}/webhook</code>
@@ -575,7 +550,7 @@ function Logs({ botId }: { botId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bot_messages")
-        .select("id, direction, text, handler, simulated, created_at, telegram_user")
+        .select("id, direction, text, handler, created_at, telegram_user")
         .eq("bot_id", botId)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -595,7 +570,6 @@ function Logs({ botId }: { botId: string }) {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {log.direction === "in" ? `↓ ${log.telegram_user ?? "utilisateur"}` : "↑ bot"}
-              {log.simulated ? " · simulation" : ""}
             </span>
             <span>{new Date(log.created_at).toLocaleTimeString("fr-FR")}</span>
           </div>
