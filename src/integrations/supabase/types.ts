@@ -14,7 +14,168 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bot_messages: {
+        Row: {
+          bot_id: string
+          chat_id: string | null
+          created_at: string
+          direction: string
+          handler: string | null
+          id: string
+          simulated: boolean
+          telegram_user: string | null
+          text: string | null
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          chat_id?: string | null
+          created_at?: string
+          direction: string
+          handler?: string | null
+          id?: string
+          simulated?: boolean
+          telegram_user?: string | null
+          text?: string | null
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          chat_id?: string | null
+          created_at?: string
+          direction?: string
+          handler?: string | null
+          id?: string
+          simulated?: boolean
+          telegram_user?: string | null
+          text?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_messages_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_secrets: {
+        Row: {
+          bot_id: string
+          created_at: string
+          id: string
+          key: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          id?: string
+          key: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          id?: string
+          key?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_secrets_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bots: {
+        Row: {
+          bot_username: string | null
+          created_at: string
+          description: string | null
+          id: string
+          kind: string
+          name: string
+          spec: Json
+          telegram_token: string | null
+          updated_at: string
+          user_id: string
+          webhook_secret: string
+          webhook_status: string
+        }
+        Insert: {
+          bot_username?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          spec?: Json
+          telegram_token?: string | null
+          updated_at?: string
+          user_id: string
+          webhook_secret?: string
+          webhook_status?: string
+        }
+        Update: {
+          bot_username?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          spec?: Json
+          telegram_token?: string | null
+          updated_at?: string
+          user_id?: string
+          webhook_secret?: string
+          webhook_status?: string
+        }
+        Relationships: []
+      }
+      studio_messages: {
+        Row: {
+          bot_id: string
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_messages_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
