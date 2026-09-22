@@ -12,8 +12,10 @@ type BotRow = {
   spec: unknown;
 };
 
-const SPEC_GUIDE = `Tu es l'architecte d'un studio de "vibe coding" pour bots Telegram.
-Tu traduis une demande en langage naturel en une SPEC JSON exécutée par un moteur maison.
+const SPEC_GUIDE = `Tu es l'assistant d'un studio de création de bots Telegram (comme Lovable, mais pour des bots).
+L'utilisateur t'écrit en langage naturel. À TOI de décider :
+- s'il demande une création / modification de logique → mode "build" : tu renvoies la spec complète mise à jour.
+- s'il pose une simple question ou discute → mode "chat" : tu réponds seulement, sans toucher à la spec.
 
 Schéma de la spec :
 {
@@ -43,48 +45,44 @@ Schéma de la spec :
 }
 
 Règles :
-- Variables disponibles dans les textes : {{text}}, {{args}}, {{first_name}}, {{chat_id}}. Les clés tierces : {{secrets.NOM}}.
-- "ai" sans "useSecret" utilise l'IA intégrée de la plateforme. Avec "useSecret", la clé de l'utilisateur est utilisée.
-- Les bots peuvent être de tout genre : calcul, prédiction, météo, gestion de groupe, quiz, support, etc. N'impose pas un chatbot IA.
-- Ordonne les handlers du plus spécifique au plus générique, termine par un "fallback" quand c'est utile.
-- Déclare dans requiredSecrets chaque clé tierce nécessaire.
-- Conserve et fais évoluer la spec existante au lieu de tout réécrire, sauf demande contraire.
+- Variables dans les textes : {{text}}, {{args}}, {{first_name}}, {{chat_id}}. Clés tierces : {{secrets.NOM}}.
+- "ai" sans "useSecret" utilise l'IA intégrée de la plateforme.
+- Les bots peuvent être de tout genre : calcul, prédiction, météo, gestion de groupe, quiz, support.
+- Ordonne les handlers du plus spécifique au plus générique, termine par un "fallback" si utile.
+- En mode "build", conserve et fais évoluer la spec existante au lieu de tout réécrire.
+- "label" : titre court de la version (ex : "Ajout de /meteo").
 
 Réponds STRICTEMENT avec un objet JSON :
-{ "reply": "explication courte en français de ce que tu viens de construire",
-  "spec": { ...la spec complète... } }`;
+{ "mode": "build" | "chat",
+  "reply": "réponse courte en français",
+  "label": "titre de la modification (mode build uniquement)",
+  "spec": { ...spec complète... }   // seulement en mode build
+}`;
 
-function extractJson(raw: string): { reply?: string; spec?: unknown } {
+function extractJson(raw: string): {
+  mode?: string;
+  reply?: string;
+  label?: string;
+  spec?: unknown;
+} {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = (fenced?.[1] ?? raw).trim();
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Réponse IA illisible.");
-  return JSON.parse(candidate.slice(start, end + 1)) as { reply?: string; spec?: unknown };
-}
-
-async function chat(messages: { role: string; content: string }[]): Promise<string> {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("LOVABLE_API_KEY manquante.");
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: "openai/gpt-6-astra", reasoning_effort: "low", messages }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    if (response.status === 429) throw new Error("Trop de requêtes IA, réessaie dans un instant.");
-    if (response.status === 402)
-      throw new Error(
-        "Crédits IA épuisés pour cet espace de travail. Ajoute des crédits pour continuer.",
-      );
-    throw new Error(`IA indisponible [${response.status}] ${detail.slice(0, 300)}`);
+  if (start === -1 || end === -1) return { mode: "chat", reply: raw.trim() };
+  try {
+    return JSON.parse(candidate.slice(start, end + 1)) as {
+      mode?: string;
+      reply?: string;
+      label?: string;
+      spec?: unknown;
+    };
+  } catch {
+    return { mode: "chat", reply: raw.trim() };
   }
-  const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-  return payload.choices?.[0]?.message?.content ?? "";
 }
 
-export const buildBotLogic = createServerFn({ method: "POST" })
+export const sendStudioMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { botId: string; message: string }) => {
     if (!input?.botId || !input?.message?.trim()) throw new Error("Message vide.");
@@ -111,79 +109,83 @@ export const buildBotLogic = createServerFn({ method: "POST" })
       .select("key")
       .eq("bot_id", data.botId);
 
-    const raw = await chat([
+    const { openRouterChat } = await import("./openrouter.server");
+    const raw = await openRouterChat([
       { role: "system", content: SPEC_GUIDE },
       {
         role: "user",
-        content: `Bot : ${bot.name}\nDescription : ${bot.description ?? "—"}\nClés déjà enregistrées : ${(secrets ?? []).map((s) => s.key).join(", ") || "aucune"}\nSpec actuelle :\n${JSON.stringify(bot.spec ?? { handlers: [] })}`,
+        content: `Bot : ${bot.name}\nDescription : ${bot.description ?? "—"}\nClés enregistrées : ${(secrets ?? []).map((s) => s.key).join(", ") || "aucune"}\nSpec actuelle :\n${JSON.stringify(bot.spec ?? { handlers: [] })}`,
       },
       ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
       { role: "user", content: data.message },
     ]);
 
     const parsed = extractJson(raw);
-    const spec: BotSpec = normalizeSpec(parsed.spec);
-    const reply = parsed.reply ?? "Spec mise à jour.";
+    const isBuild = parsed.mode === "build" && parsed.spec;
+    const reply = parsed.reply ?? (isBuild ? "Logique mise à jour." : "…");
+    let spec: BotSpec | null = null;
 
-    await supabase.from("bots").update({ spec }).eq("id", data.botId);
+    if (isBuild) {
+      spec = normalizeSpec(parsed.spec);
+      await supabase.from("bots").update({ spec }).eq("id", data.botId);
+
+      const { data: last } = await supabase
+        .from("bot_versions")
+        .select("version")
+        .eq("bot_id", data.botId)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      await supabase.from("bot_versions").insert({
+        bot_id: data.botId,
+        user_id: userId,
+        version: (last?.version ?? 0) + 1,
+        label: parsed.label ?? data.message.slice(0, 80),
+        spec,
+      });
+    }
+
     await supabase.from("studio_messages").insert([
       { bot_id: data.botId, user_id: userId, role: "user", content: data.message },
       { bot_id: data.botId, user_id: userId, role: "assistant", content: reply },
     ]);
 
-    return { reply, spec };
+    return { reply, spec, mode: isBuild ? "build" : "chat" };
   });
 
-export const simulateMessage = createServerFn({ method: "POST" })
+export const restoreVersion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { botId: string; text: string }) => ({
+  .inputValidator((input: { botId: string; versionId: string }) => ({
     botId: input.botId,
-    text: (input.text ?? "").slice(0, 2000),
+    versionId: input.versionId,
   }))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: bot } = await supabase
-      .from("bots")
-      .select("id, spec")
-      .eq("id", data.botId)
+    const { data: version } = await supabase
+      .from("bot_versions")
+      .select("id, version, spec, label")
+      .eq("id", data.versionId)
       .maybeSingle();
-    if (!bot) throw new Error("Bot introuvable.");
+    if (!version) throw new Error("Version introuvable.");
 
-    const { data: secretRows } = await supabase
-      .from("bot_secrets")
-      .select("key, value")
-      .eq("bot_id", data.botId);
-    const secrets = Object.fromEntries((secretRows ?? []).map((s) => [s.key, s.value]));
+    await supabase.from("bots").update({ spec: version.spec }).eq("id", data.botId);
 
-    const { runBot } = await import("./bot-engine.server");
-    const result = await runBot(
-      bot.spec,
-      { text: data.text, firstName: "Testeur", chatId: "simulateur" },
-      secrets,
-    );
+    const { data: last } = await supabase
+      .from("bot_versions")
+      .select("version")
+      .eq("bot_id", data.botId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    await supabase.from("bot_versions").insert({
+      bot_id: data.botId,
+      user_id: userId,
+      version: (last?.version ?? 0) + 1,
+      label: `Retour à la version ${version.version}`,
+      spec: version.spec,
+    });
 
-    await supabase.from("bot_messages").insert([
-      {
-        bot_id: data.botId,
-        user_id: userId,
-        chat_id: "simulateur",
-        telegram_user: "Testeur",
-        direction: "in",
-        text: data.text,
-        simulated: true,
-      },
-      {
-        bot_id: data.botId,
-        user_id: userId,
-        chat_id: "simulateur",
-        direction: "out",
-        text: result.text,
-        handler: result.handler,
-        simulated: true,
-      },
-    ]);
-
-    return result;
+    return { ok: true, version: version.version };
   });
 
 function publicOrigin(): string {
