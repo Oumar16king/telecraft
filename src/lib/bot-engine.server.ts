@@ -96,36 +96,17 @@ async function callAi(
   userText: string,
   options: { model?: string; apiKey?: string },
 ): Promise<string> {
-  const usingUserKey = Boolean(options.apiKey);
-  const endpoint = usingUserKey
-    ? "https://api.openai.com/v1/chat/completions"
-    : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const key = options.apiKey ?? process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("Aucune clé IA disponible.");
-
-  const model = usingUserKey ? (options.model ?? "gpt-4o-mini") : "openai/gpt-6-astra";
-  const body: Record<string, unknown> = {
-    model,
-    messages: [
+  const { openRouterChat } = await import("./openrouter.server");
+  return await openRouterChat(
+    [
       { role: "system", content: system || "Tu es un assistant Telegram utile et concis." },
       { role: "user", content: userText || "Bonjour" },
     ],
-  };
-  if (!usingUserKey) body["reasoning_effort"] = "low";
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`IA indisponible [${response.status}]: ${detail.slice(0, 300)}`);
-  }
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return payload.choices?.[0]?.message?.content?.trim() || "Je n'ai pas de réponse pour l'instant.";
+    {
+      ...(options.apiKey ? { apiKey: options.apiKey } : {}),
+      ...(options.model ? { model: options.model } : {}),
+    },
+  );
 }
 
 async function runAction(
