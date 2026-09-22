@@ -1,25 +1,25 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bot, LogOut, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Bot, Plus, Radio, Sparkles, Terminal, Trash2, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Telecraft — Vibe coding pour bots Telegram" },
+      { title: "Telecraft — Crée ton bot Telegram en discutant" },
       {
         name: "description",
         content:
-          "Crée n'importe quel bot Telegram en langage naturel : calcul, météo, prédiction, gestion de groupe. Ton token BotFather, tes clés, exécution hébergée sans VPS.",
+          "Telecraft transforme une simple conversation en bot Telegram fonctionnel : calcul, météo, quiz, gestion de groupe. Ton token, tes clés, aucun serveur à gérer.",
       },
-      { property: "og:title", content: "Telecraft — Vibe coding pour bots Telegram" },
+      { property: "og:title", content: "Telecraft — Crée ton bot Telegram en discutant" },
       {
         property: "og:description",
         content:
-          "Décris ton bot, l'IA écrit sa logique, la plateforme l'exécute. Un webhook par bot, zéro serveur à gérer.",
+          "Décris ton bot, Telecraft l'écrit et le met en ligne. Chaque version est restaurable.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -28,28 +28,17 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type BotRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  bot_username: string | null;
-  webhook_status: string;
-  updated_at: string;
-};
-
 function Home() {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
+  if (loading && !session) return <Landing />;
   return session ? <Dashboard /> : <Landing />;
 }
 
 function Landing() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_50%_0%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent)]" />
-      <header className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2 font-display text-lg font-semibold">
-          <Bot className="size-5 text-primary" /> Telecraft
-        </div>
+    <div className="min-h-screen">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+        <Brand />
         <Link
           to="/auth"
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
@@ -58,58 +47,30 @@ function Landing() {
         </Link>
       </header>
 
-      <main className="relative mx-auto max-w-6xl px-6 pb-24">
-        <p className="mt-16 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          <Sparkles className="size-3.5 text-primary" /> Uniquement pour Telegram
-        </p>
-        <h1 className="mt-6 max-w-3xl font-display text-5xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
-          Décris ton bot Telegram.
-          <span className="block text-primary">Il existe deux minutes plus tard.</span>
+      <main className="mx-auto max-w-3xl px-6 py-20 text-center">
+        <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
+          Crée ton bot Telegram en discutant
         </h1>
-        <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          Colle ton token BotFather, discute en langage naturel, et la plateforme exécute la logique
-          de ton bot pour toi. Calculatrice, météo, prédictions, modération de groupe, quiz, support
-          — pas seulement des chatbots.
+        <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
+          Donne le nom et le token de ton bot, explique ce qu'il doit faire. Telecraft écrit la
+          logique en direct et la met en ligne. Chaque version reste restaurable.
         </p>
-        <div className="mt-9 flex flex-wrap gap-3">
-          <Link
-            to="/auth"
-            className="rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Créer mon premier bot
-          </Link>
-          <a
-            href="https://t.me/BotFather"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-border bg-card px-5 py-3 text-sm font-medium hover:bg-accent"
-          >
-            Obtenir un token BotFather
-          </a>
-        </div>
+        <Link
+          to="/auth"
+          className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          <Plus className="size-4" /> Créer mon bot
+        </Link>
 
-        <div className="mt-20 grid gap-4 md:grid-cols-3">
+        <div className="mt-16 grid gap-4 text-left sm:grid-cols-3">
           {[
-            {
-              icon: Terminal,
-              title: "Studio de vibe coding",
-              body: "Tu écris l'intention, l'IA écrit les déclencheurs et les actions. Tu vois la logique se construire en direct.",
-            },
-            {
-              icon: Zap,
-              title: "Simulateur Telegram",
-              body: "Teste chaque commande dans un faux chat avant d'activer le bot pour de vrai.",
-            },
-            {
-              icon: Radio,
-              title: "Exécution hébergée",
-              body: "Une adresse webhook dédiée par bot. Aucun VPS, aucun déploiement à gérer.",
-            },
-          ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
-              <item.icon className="size-5 text-primary" />
-              <h2 className="mt-4 font-display text-lg font-semibold">{item.title}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
+            ["Tous les genres", "Calcul, météo, quiz, prédiction, gestion de groupe."],
+            ["Tes clés", "Ton token BotFather et tes clés API restent les tiennes."],
+            ["Historique", "Reviens à n'importe quelle version précédente en un clic."],
+          ].map(([title, text]) => (
+            <div key={title} className="rounded-xl border border-border bg-card p-5">
+              <p className="font-medium">{title}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">{text}</p>
             </div>
           ))}
         </div>
@@ -118,19 +79,31 @@ function Landing() {
   );
 }
 
+function Brand() {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+        <Bot className="size-4" />
+      </span>
+      <span className="font-display text-lg font-semibold">Telecraft</span>
+    </div>
+  );
+}
+
 function Dashboard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [token, setToken] = useState("");
 
   const { data: bots, isLoading } = useQuery({
     queryKey: ["bots"],
-    queryFn: async (): Promise<BotRow[]> => {
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("bots")
-        .select("id, name, description, bot_username, webhook_status, updated_at")
-        .order("updated_at", { ascending: false });
+        .select("id, name, bot_username, webhook_status, created_at")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -140,26 +113,23 @@ function Dashboard() {
     mutationFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) throw new Error("Session expirée");
+      if (!userId) throw new Error("Session expirée.");
       const { data, error } = await supabase
         .from("bots")
-        .insert({
-          user_id: userId,
-          name: name.trim() || "Nouveau bot",
-          description: description.trim() || null,
-        })
+        .insert({ user_id: userId, name: name.trim(), telegram_token: token.trim() })
         .select("id")
         .single();
       if (error) throw error;
-      return data.id;
+      return data;
     },
-    onSuccess: (id) => {
+    onSuccess: (data) => {
+      setOpen(false);
       setName("");
-      setDescription("");
-      queryClient.invalidateQueries({ queryKey: ["bots"] });
-      navigate({ to: "/bots/$botId", params: { botId: id } });
+      setToken("");
+      void queryClient.invalidateQueries({ queryKey: ["bots"] });
+      void navigate({ to: "/bots/$botId", params: { botId: data.id } });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const remove = useMutation({
@@ -167,120 +137,116 @@ function Dashboard() {
       const { error } = await supabase.from("bots").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bots"] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["bots"] });
+      toast.success("Bot supprimé");
+    },
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar />
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <h1 className="font-display text-3xl font-semibold">Mes bots</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Chaque bot a son token, ses clés et sa propre adresse webhook.
-        </p>
+    <div className="min-h-screen">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+          <Brand />
+          <button
+            onClick={() => void supabase.auth.signOut()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent"
+          >
+            <LogOut className="size-3.5" /> Déconnexion
+          </button>
+        </div>
+      </header>
 
-        <div className="mt-8 rounded-2xl border border-border bg-card p-5">
-          <p className="font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            Nouveau bot
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr_auto]">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nom du bot"
-              className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-            />
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex : bot météo pour mon groupe de randonnée"
-              className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-            />
-            <button
-              onClick={() => create.mutate()}
-              disabled={create.isPending}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            >
-              <Plus className="size-4" /> Créer
-            </button>
-          </div>
+      <main className="mx-auto max-w-4xl px-6 py-10">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-semibold">Mes bots</h1>
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+            aria-label="Créer un bot"
+          >
+            <Plus className="size-5" />
+          </button>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {isLoading && <p className="text-sm text-muted-foreground">Chargement…</p>}
-          {bots?.length === 0 && (
-            <p className="text-sm text-muted-foreground">Aucun bot pour l'instant.</p>
-          )}
-          {bots?.map((bot) => (
-            <div
-              key={bot.id}
-              className="group rounded-2xl border border-border bg-card p-5 transition hover:border-primary/50"
+        {isLoading ? (
+          <p className="mt-8 text-sm text-muted-foreground">Chargement…</p>
+        ) : !bots?.length ? (
+          <div className="mt-8 rounded-xl border border-dashed border-border p-10 text-center">
+            <p className="text-muted-foreground">Aucun bot pour l'instant.</p>
+            <button
+              onClick={() => setOpen(true)}
+              className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
-              <div className="flex items-start justify-between gap-3">
-                <Link
-                  to="/bots/$botId"
-                  params={{ botId: bot.id }}
-                  className="font-display text-lg font-semibold hover:text-primary"
-                >
-                  {bot.name}
+              Créer mon premier bot
+            </button>
+          </div>
+        ) : (
+          <ul className="mt-6 space-y-3">
+            {bots.map((bot) => (
+              <li
+                key={bot.id}
+                className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
+              >
+                <Link to="/bots/$botId" params={{ botId: bot.id }} className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{bot.name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {bot.bot_username ? `@${bot.bot_username} · ` : ""}
+                    {bot.webhook_status === "active" ? "En ligne" : "Hors ligne"}
+                  </p>
                 </Link>
                 <button
                   onClick={() => remove.mutate(bot.id)}
-                  className="rounded-md p-1.5 text-muted-foreground opacity-0 transition hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
-                  aria-label="Supprimer le bot"
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-destructive"
+                  aria-label="Supprimer"
                 >
                   <Trash2 className="size-4" />
                 </button>
-              </div>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                {bot.description ?? "Pas de description"}
-              </p>
-              <div className="mt-4 flex items-center gap-3 text-xs">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-                    bot.webhook_status === "active"
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  <Radio className="size-3" />
-                  {bot.webhook_status === "active" ? "En ligne" : "Hors ligne"}
-                </span>
-                {bot.bot_username && (
-                  <span className="text-muted-foreground">@{bot.bot_username}</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </main>
-    </div>
-  );
-}
 
-export function TopBar() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2 font-display font-semibold">
-          <Bot className="size-5 text-primary" /> Telecraft
-        </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="hidden text-muted-foreground sm:inline">{user?.email}</span>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate({ to: "/auth" });
-            }}
-            className="rounded-lg border border-border px-3 py-1.5 hover:bg-accent"
-          >
-            Déconnexion
-          </button>
+      {open && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6">
+            <h2 className="font-display text-lg font-semibold">Nouveau bot</h2>
+            <label className="mt-5 block text-sm font-medium">Nom du bot</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Mon assistant météo"
+              className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+            <label className="mt-4 block text-sm font-medium">Token BotFather</label>
+            <input
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="123456789:AA..."
+              className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Crée le bot avec @BotFather sur Telegram, puis colle ici le token qu'il te donne.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => create.mutate()}
+                disabled={!name.trim() || !token.trim() || create.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              >
+                {create.isPending ? "Création…" : "Créer"}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      )}
+    </div>
   );
 }
