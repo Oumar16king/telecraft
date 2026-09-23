@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_files: {
+        Row: {
+          bot_id: string
+          content: string
+          created_at: string
+          id: string
+          path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_files_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_messages: {
         Row: {
           bot_id: string
@@ -96,10 +134,43 @@ export type Database = {
           },
         ]
       }
+      bot_store: {
+        Row: {
+          bot_id: string
+          id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          bot_id: string
+          id?: string
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          bot_id?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_store_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_versions: {
         Row: {
           bot_id: string
           created_at: string
+          files: Json
           id: string
           label: string | null
           spec: Json
@@ -109,6 +180,7 @@ export type Database = {
         Insert: {
           bot_id: string
           created_at?: string
+          files?: Json
           id?: string
           label?: string | null
           spec?: Json
@@ -118,6 +190,7 @@ export type Database = {
         Update: {
           bot_id?: string
           created_at?: string
+          files?: Json
           id?: string
           label?: string | null
           spec?: Json
@@ -179,6 +252,53 @@ export type Database = {
         }
         Relationships: []
       }
+      studio_events: {
+        Row: {
+          bot_id: string
+          created_at: string
+          detail: string | null
+          duration_ms: number | null
+          id: string
+          label: string
+          seq: number
+          turn_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          detail?: string | null
+          duration_ms?: number | null
+          id?: string
+          label?: string
+          seq?: number
+          turn_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          detail?: string | null
+          duration_ms?: number | null
+          id?: string
+          label?: string
+          seq?: number
+          turn_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_events_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_messages: {
         Row: {
           bot_id: string
@@ -186,6 +306,7 @@ export type Database = {
           created_at: string
           id: string
           role: string
+          turn_id: string | null
           user_id: string
         }
         Insert: {
@@ -194,6 +315,7 @@ export type Database = {
           created_at?: string
           id?: string
           role: string
+          turn_id?: string | null
           user_id: string
         }
         Update: {
@@ -202,6 +324,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: string
+          turn_id?: string | null
           user_id?: string
         }
         Relationships: [
