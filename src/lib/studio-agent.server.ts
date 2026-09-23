@@ -9,6 +9,7 @@ export type AgentEvent =
   | { t: "reasoning"; v: string }
   | { t: "thought"; ms: number; detail: string }
   | { t: "action"; type: string; label: string; detail: string }
+  | { t: "final"; v: string }
   | { t: "done" }
   | { t: "error"; v: string };
 
@@ -352,6 +353,6 @@ ${files.length ? files.map((f) => `- ${f.path} (${f.content.length} caractères)
     turn_id: turnId,
   });
 
-  if (!finalText.trim().length) yield { t: "text", v: finalText };
+  yield { t: "final", v: finalText };
   yield { t: "done" };
 }
