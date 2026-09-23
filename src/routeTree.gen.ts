@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BotsBotIdRouteImport } from './routes/bots.$botId'
+import { Route as ApiStudioChatRouteImport } from './routes/api/studio/chat'
 import { Route as ApiPublicBotsBotIdWebhookRouteImport } from './routes/api/public/bots/$botId/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const BotsBotIdRoute = BotsBotIdRouteImport.update({
   path: '/bots/$botId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStudioChatRoute = ApiStudioChatRouteImport.update({
+  id: '/api/studio/chat',
+  path: '/api/studio/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicBotsBotIdWebhookRoute =
   ApiPublicBotsBotIdWebhookRouteImport.update({
     id: '/api/public/bots/$botId/webhook',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/bots/$botId': typeof BotsBotIdRoute
+  '/api/studio/chat': typeof ApiStudioChatRoute
   '/api/public/bots/$botId/webhook': typeof ApiPublicBotsBotIdWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/bots/$botId': typeof BotsBotIdRoute
+  '/api/studio/chat': typeof ApiStudioChatRoute
   '/api/public/bots/$botId/webhook': typeof ApiPublicBotsBotIdWebhookRoute
 }
 export interface FileRoutesById {
@@ -53,18 +61,30 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/bots/$botId': typeof BotsBotIdRoute
+  '/api/studio/chat': typeof ApiStudioChatRoute
   '/api/public/bots/$botId/webhook': typeof ApiPublicBotsBotIdWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/bots/$botId' | '/api/public/bots/$botId/webhook'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/bots/$botId'
+    | '/api/studio/chat'
+    | '/api/public/bots/$botId/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/bots/$botId' | '/api/public/bots/$botId/webhook'
+  to:
+    | '/'
+    | '/auth'
+    | '/bots/$botId'
+    | '/api/studio/chat'
+    | '/api/public/bots/$botId/webhook'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/bots/$botId'
+    | '/api/studio/chat'
     | '/api/public/bots/$botId/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -72,6 +92,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   BotsBotIdRoute: typeof BotsBotIdRoute
+  ApiStudioChatRoute: typeof ApiStudioChatRoute
   ApiPublicBotsBotIdWebhookRoute: typeof ApiPublicBotsBotIdWebhookRoute
 }
 
@@ -98,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BotsBotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/studio/chat': {
+      id: '/api/studio/chat'
+      path: '/api/studio/chat'
+      fullPath: '/api/studio/chat'
+      preLoaderRoute: typeof ApiStudioChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bots/$botId/webhook': {
       id: '/api/public/bots/$botId/webhook'
       path: '/api/public/bots/$botId/webhook'
@@ -112,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   BotsBotIdRoute: BotsBotIdRoute,
+  ApiStudioChatRoute: ApiStudioChatRoute,
   ApiPublicBotsBotIdWebhookRoute: ApiPublicBotsBotIdWebhookRoute,
 }
 export const routeTree = rootRouteImport

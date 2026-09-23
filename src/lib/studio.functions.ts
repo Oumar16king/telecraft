@@ -1,157 +1,67 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { normalizeSpec, type BotSpec } from "./bot-spec";
 
-type BotRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  telegram_token: string | null;
-  webhook_secret: string;
-  spec: unknown;
-};
+export type ProjectFile = { path: string; content: string };
 
-const SPEC_GUIDE = `Tu es l'assistant d'un studio de création de bots Telegram (comme Lovable, mais pour des bots).
-L'utilisateur t'écrit en langage naturel. À TOI de décider :
-- s'il demande une création / modification de logique → mode "build" : tu renvoies la spec complète mise à jour.
-- s'il pose une simple question ou discute → mode "chat" : tu réponds seulement, sans toucher à la spec.
+/* ------------------------------ files ------------------------------ */
 
-Schéma de la spec :
-{
-  "persona": string,
-  "welcome": string,                       // réponse à /start
-  "commands": [{ "command": "meteo", "description": "..." }],
-  "requiredSecrets": [{ "key": "OPENWEATHER_KEY", "description": "..." }],
-  "handlers": [
-    {
-      "id": "slug-unique",
-      "label": "Nom lisible",
-      "trigger": { "type": "command", "value": "meteo" }
-              | { "type": "keywords", "values": ["salut","bonjour"] }
-              | { "type": "regex", "pattern": "^[0-9+\\\\-*/() ]+$" }
-              | { "type": "any" }
-              | { "type": "fallback" },
-      "action": { "type": "reply", "text": "Bonjour {{first_name}}" }
-              | { "type": "choice", "options": ["A","B"] }
-              | { "type": "calc" }
-              | { "type": "ai", "system": "consignes", "useSecret": "OPENAI_API_KEY" }
-              | { "type": "http", "method": "GET", "url": "https://api...?key={{secrets.MA_CLE}}&q={{args}}",
-                  "headers": {"Authorization": "Bearer {{secrets.MA_CLE}}"},
-                  "format": "Explique la météo en une phrase" },
-      "buttons": [["Bouton 1","Bouton 2"]]
-    }
-  ]
-}
-
-Règles :
-- Variables dans les textes : {{text}}, {{args}}, {{first_name}}, {{chat_id}}. Clés tierces : {{secrets.NOM}}.
-- "ai" sans "useSecret" utilise l'IA intégrée de la plateforme.
-- Les bots peuvent être de tout genre : calcul, prédiction, météo, gestion de groupe, quiz, support.
-- Ordonne les handlers du plus spécifique au plus générique, termine par un "fallback" si utile.
-- En mode "build", conserve et fais évoluer la spec existante au lieu de tout réécrire.
-- "label" : titre court de la version (ex : "Ajout de /meteo").
-
-Réponds STRICTEMENT avec un objet JSON :
-{ "mode": "build" | "chat",
-  "reply": "réponse courte en français",
-  "label": "titre de la modification (mode build uniquement)",
-  "spec": { ...spec complète... }   // seulement en mode build
-}`;
-
-function extractJson(raw: string): {
-  mode?: string;
-  reply?: string;
-  label?: string;
-  spec?: unknown;
-} {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = (fenced?.[1] ?? raw).trim();
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1) return { mode: "chat", reply: raw.trim() };
-  try {
-    return JSON.parse(candidate.slice(start, end + 1)) as {
-      mode?: string;
-      reply?: string;
-      label?: string;
-      spec?: unknown;
-    };
-  } catch {
-    return { mode: "chat", reply: raw.trim() };
-  }
-}
-
-export const sendStudioMessage = createServerFn({ method: "POST" })
+export const listBotFiles = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { botId: string; message: string }) => {
-    if (!input?.botId || !input?.message?.trim()) throw new Error("Message vide.");
-    return { botId: input.botId, message: input.message.trim().slice(0, 4000) };
+  .inputValidator((input: { botId: string }) => ({ botId: input.botId }))
+  .handler(async ({ data, context }) => {
+    const { data: files } = await context.supabase
+      .from("bot_files")
+      .select("id, path, content, updated_at")
+      .eq("bot_id", data.botId)
+      .order("path", { ascending: true });
+    return files ?? [];
+  });
+
+export const saveBotFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { botId: string; path: string; content: string }) => {
+    const path = input.path?.trim().replace(/^\/+/, "");
+    if (!path) throw new Error("Chemin de fichier manquant.");
+    return { botId: input.botId, path, content: input.content ?? "" };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: bot, error } = await supabase
-      .from("bots")
-      .select("id, name, description, spec")
-      .eq("id", data.botId)
-      .maybeSingle();
-    if (error || !bot) throw new Error("Bot introuvable.");
-
-    const { data: history } = await supabase
-      .from("studio_messages")
-      .select("role, content")
+    const { data: existing } = await supabase
+      .from("bot_files")
+      .select("id")
       .eq("bot_id", data.botId)
-      .order("created_at", { ascending: true })
-      .limit(20);
-
-    const { data: secrets } = await supabase
-      .from("bot_secrets")
-      .select("key")
-      .eq("bot_id", data.botId);
-
-    const { openRouterChat } = await import("./openrouter.server");
-    const raw = await openRouterChat([
-      { role: "system", content: SPEC_GUIDE },
-      {
-        role: "user",
-        content: `Bot : ${bot.name}\nDescription : ${bot.description ?? "—"}\nClés enregistrées : ${(secrets ?? []).map((s) => s.key).join(", ") || "aucune"}\nSpec actuelle :\n${JSON.stringify(bot.spec ?? { handlers: [] })}`,
-      },
-      ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: data.message },
-    ]);
-
-    const parsed = extractJson(raw);
-    const isBuild = parsed.mode === "build" && parsed.spec;
-    const reply = parsed.reply ?? (isBuild ? "Logique mise à jour." : "…");
-    let spec: BotSpec | null = null;
-
-    if (isBuild) {
-      spec = normalizeSpec(parsed.spec);
-      await supabase.from("bots").update({ spec }).eq("id", data.botId);
-
-      const { data: last } = await supabase
-        .from("bot_versions")
-        .select("version")
-        .eq("bot_id", data.botId)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      await supabase.from("bot_versions").insert({
+      .eq("path", data.path)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from("bot_files").update({ content: data.content }).eq("id", existing.id);
+    } else {
+      await supabase.from("bot_files").insert({
         bot_id: data.botId,
         user_id: userId,
-        version: (last?.version ?? 0) + 1,
-        label: parsed.label ?? data.message.slice(0, 80),
-        spec,
+        path: data.path,
+        content: data.content,
       });
     }
-
-    await supabase.from("studio_messages").insert([
-      { bot_id: data.botId, user_id: userId, role: "user", content: data.message },
-      { bot_id: data.botId, user_id: userId, role: "assistant", content: reply },
-    ]);
-
-    return { reply, spec, mode: isBuild ? "build" : "chat" };
+    return { ok: true };
   });
+
+export const deleteBotFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { botId: string; path: string }) => ({
+    botId: input.botId,
+    path: input.path,
+  }))
+  .handler(async ({ data, context }) => {
+    await context.supabase
+      .from("bot_files")
+      .delete()
+      .eq("bot_id", data.botId)
+      .eq("path", data.path);
+    return { ok: true };
+  });
+
+/* ------------------------------ versions ------------------------------ */
 
 export const restoreVersion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -163,12 +73,23 @@ export const restoreVersion = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: version } = await supabase
       .from("bot_versions")
-      .select("id, version, spec, label")
+      .select("id, version, files")
       .eq("id", data.versionId)
       .maybeSingle();
     if (!version) throw new Error("Version introuvable.");
 
-    await supabase.from("bots").update({ spec: version.spec }).eq("id", data.botId);
+    const files = (Array.isArray(version.files) ? version.files : []) as ProjectFile[];
+    await supabase.from("bot_files").delete().eq("bot_id", data.botId);
+    if (files.length) {
+      await supabase.from("bot_files").insert(
+        files.map((f) => ({
+          bot_id: data.botId,
+          user_id: userId,
+          path: f.path,
+          content: f.content,
+        })),
+      );
+    }
 
     const { data: last } = await supabase
       .from("bot_versions")
@@ -182,11 +103,174 @@ export const restoreVersion = createServerFn({ method: "POST" })
       user_id: userId,
       version: (last?.version ?? 0) + 1,
       label: `Retour à la version ${version.version}`,
-      spec: version.spec,
+      files: files as unknown as never,
     });
 
-    return { ok: true, version: version.version };
+    return { ok: true, version: version.version, files: files.length };
   });
+
+/* ------------------------------ export .zip ------------------------------ */
+
+const READ_ME = (name: string) => `# ${name}
+
+Bot Telegram exporté depuis Telecraft.
+
+## Installation
+
+1. \`npm install\`
+2. Crée un fichier \`.env\` :
+
+\`\`\`
+TELEGRAM_TOKEN=le_token_de_ton_bot
+\`\`\`
+
+3. \`npm start\` (le lanceur utilise le long polling, aucun serveur web nécessaire).
+
+## Structure
+
+- \`bot.js\` : point d'entrée, exporte \`handleUpdate(update, api, env)\`.
+- \`commands/\` et \`lib/\` : la logique du bot.
+- \`run.js\` : lanceur autonome (polling + mémoire persistante dans \`store.json\`).
+`;
+
+const RUNNER = `// Lanceur autonome : long polling Telegram + mémoire persistante sur disque.
+const fs = require("fs");
+const path = require("path");
+const bot = require("./bot.js");
+
+const TOKEN = process.env.TELEGRAM_TOKEN;
+if (!TOKEN) throw new Error("TELEGRAM_TOKEN manquant.");
+const BASE = "https://api.telegram.org/bot" + TOKEN + "/";
+const STORE_FILE = path.join(__dirname, "store.json");
+
+function readStore() {
+  try {
+    return JSON.parse(fs.readFileSync(STORE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function writeStore(data) {
+  fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2));
+}
+
+const store = {
+  async get(key) {
+    return readStore()[key];
+  },
+  async set(key, value) {
+    const data = readStore();
+    data[key] = value;
+    writeStore(data);
+  },
+  async delete(key) {
+    const data = readStore();
+    delete data[key];
+    writeStore(data);
+  },
+  async list(prefix = "") {
+    return Object.entries(readStore())
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => ({ key, value }));
+  },
+};
+
+async function call(method, payload = {}) {
+  const response = await fetch(BASE + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json();
+  if (!body.ok) throw new Error("Telegram " + method + ": " + body.description);
+  return body.result;
+}
+
+const api = new Proxy({ call }, {
+  get(target, prop) {
+    if (prop in target) return target[prop];
+    return (payload = {}) => call(prop, payload);
+  },
+});
+
+const env = { secrets: process.env, store, log: console.log };
+
+(async () => {
+  await call("deleteWebhook", { drop_pending_updates: false });
+  let offset = 0;
+  console.log("Bot en écoute…");
+  for (;;) {
+    try {
+      const updates = await call("getUpdates", { offset, timeout: 30 });
+      for (const update of updates) {
+        offset = update.update_id + 1;
+        try {
+          await bot.handleUpdate(update, api, env);
+        } catch (error) {
+          console.error("handleUpdate:", error.message);
+        }
+      }
+    } catch (error) {
+      console.error("polling:", error.message);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+})();
+`;
+
+export const exportBotZip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { botId: string }) => ({ botId: input.botId }))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: bot } = await supabase
+      .from("bots")
+      .select("id, name")
+      .eq("id", data.botId)
+      .maybeSingle();
+    if (!bot) throw new Error("Bot introuvable.");
+
+    const { data: files } = await supabase
+      .from("bot_files")
+      .select("path, content")
+      .eq("bot_id", data.botId);
+
+    const slug =
+      bot.name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "bot-telegram";
+
+    const entries: ProjectFile[] = [...(files ?? [])];
+    if (!entries.some((f) => f.path === "package.json")) {
+      entries.push({
+        path: "package.json",
+        content: `${JSON.stringify(
+          {
+            name: slug,
+            version: "1.0.0",
+            private: true,
+            main: "bot.js",
+            scripts: { start: "node run.js" },
+          },
+          null,
+          2,
+        )}\n`,
+      });
+    }
+    if (!entries.some((f) => f.path === "README.md")) {
+      entries.push({ path: "README.md", content: READ_ME(bot.name) });
+    }
+    if (!entries.some((f) => f.path === "run.js")) {
+      entries.push({ path: "run.js", content: RUNNER });
+    }
+
+    const { createZip, toBase64 } = await import("./zip.server");
+    return { filename: `${slug}.zip`, base64: toBase64(createZip(entries)) };
+  });
+
+/* ------------------------------ telegram ------------------------------ */
 
 function publicOrigin(): string {
   const url = new URL(getRequest().url);
@@ -209,13 +293,12 @@ export const connectTelegram = createServerFn({ method: "POST" })
       .from("bots")
       .select("id, telegram_token, webhook_secret")
       .eq("id", data.botId)
-      .maybeSingle<BotRow>();
+      .maybeSingle();
     if (!bot) throw new Error("Bot introuvable.");
     if (!bot.telegram_token) throw new Error("Ajoute d'abord le token BotFather de ton bot.");
 
     const api = `https://api.telegram.org/bot${bot.telegram_token}`;
-    const meResponse = await fetch(`${api}/getMe`);
-    const me = (await meResponse.json()) as {
+    const me = (await (await fetch(`${api}/getMe`)).json()) as {
       ok: boolean;
       description?: string;
       result?: { username?: string };
@@ -223,26 +306,36 @@ export const connectTelegram = createServerFn({ method: "POST" })
     if (!me.ok) throw new Error(`Token refusé par Telegram : ${me.description ?? "inconnu"}`);
 
     const webhookUrl = `${publicOrigin()}/api/public/bots/${bot.id}/webhook`;
-    const hookResponse = await fetch(`${api}/setWebhook`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: webhookUrl,
-        secret_token: bot.webhook_secret,
-        allowed_updates: ["message", "edited_message", "callback_query"],
-        drop_pending_updates: true,
-      }),
-    });
-    const hook = (await hookResponse.json()) as { ok: boolean; description?: string };
+    const hook = (await (
+      await fetch(`${api}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: webhookUrl,
+          secret_token: bot.webhook_secret,
+          allowed_updates: [
+            "message",
+            "edited_message",
+            "channel_post",
+            "edited_channel_post",
+            "callback_query",
+            "inline_query",
+            "chat_member",
+            "my_chat_member",
+            "chat_join_request",
+            "poll",
+            "poll_answer",
+          ],
+          drop_pending_updates: true,
+        }),
+      })
+    ).json()) as { ok: boolean; description?: string };
     if (!hook.ok)
       throw new Error(`Telegram a refusé le webhook : ${hook.description ?? "inconnu"}`);
 
     await supabase
       .from("bots")
-      .update({
-        webhook_status: "active",
-        bot_username: me.result?.username ?? null,
-      })
+      .update({ webhook_status: "active", bot_username: me.result?.username ?? null })
       .eq("id", bot.id);
 
     return { username: me.result?.username ?? null, webhookUrl };
@@ -257,7 +350,7 @@ export const disconnectTelegram = createServerFn({ method: "POST" })
       .from("bots")
       .select("id, telegram_token")
       .eq("id", data.botId)
-      .maybeSingle<BotRow>();
+      .maybeSingle();
     if (!bot?.telegram_token) throw new Error("Bot introuvable.");
     await fetch(`https://api.telegram.org/bot${bot.telegram_token}/deleteWebhook`, {
       method: "POST",
