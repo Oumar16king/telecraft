@@ -488,7 +488,7 @@ function Versions({ botId }: { botId: string }) {
   const apply = useMutation({
     mutationFn: async (versionId: string) => await restore({ data: { botId, versionId } }),
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["bot", botId] });
+      void queryClient.invalidateQueries({ queryKey: ["files", botId] });
       void queryClient.invalidateQueries({ queryKey: ["versions", botId] });
       toast.success(`Version ${result.version} restaurée`);
     },
