@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/studio/chat")({
         const body = (await request.json().catch(() => ({}))) as {
           botId?: string;
           message?: string;
+          model?: string;
         };
         const botId = body.botId;
         const message = body.message?.trim().slice(0, 6000);
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/api/studio/chat")({
                 botId,
                 message,
                 signal: request.signal,
+                ...(body.model ? { model: body.model } : {}),
               })) {
                 send(event);
               }

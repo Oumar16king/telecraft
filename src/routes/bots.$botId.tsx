@@ -35,6 +35,14 @@ import {
   restoreVersion,
 } from "@/lib/studio.functions";
 
+const MODEL_OPTIONS = [
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (rapide)" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (raisonnement)" },
+  { id: "thinkingmachines/inkling:free", label: "Inkling (OpenRouter)" },
+  { id: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra (OpenRouter)" },
+  { id: "nex-agi/nex-n2.5-pro:free", label: "Nex N2.5 Pro (OpenRouter)" },
+];
+
 export const Route = createFileRoute("/bots/$botId")({
   head: () => ({
     meta: [
@@ -267,6 +275,11 @@ function VibeChat({ botId }: { botId: string }) {
 
   const busy = !!live;
 
+  const [model, setModel] = useState<string>(MODEL_OPTIONS[0]!.id);
+  useEffect(() => {
+    const saved = localStorage.getItem("telecraft-model");
+    if (saved && MODEL_OPTIONS.some((m) => m.id === saved)) setModel(saved);
+  }, []);
   const submit = async () => {
     const message = input.trim();
     if (!message || busy) return;
@@ -285,7 +298,7 @@ function VibeChat({ botId }: { botId: string }) {
           "content-type": "application/json",
           authorization: `Bearer ${data.session?.access_token ?? ""}`,
         },
-        body: JSON.stringify({ botId, message }),
+        body: JSON.stringify({ botId, message, model }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(res.status === 401 ? "Session expirée." : "Erreur du serveur.");
@@ -381,6 +394,22 @@ function VibeChat({ botId }: { botId: string }) {
       </div>
 
       <div className="border-t border-border p-3">
+        <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 text-xs text-muted-foreground">
+          <span>Modèle</span>
+          <select
+            value={model}
+            onChange={(e) => {
+              setModel(e.target.value);
+              localStorage.setItem("telecraft-model", e.target.value);
+            }}
+            disabled={busy}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+          >
+            {MODEL_OPTIONS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-input bg-background p-2 focus-within:border-primary">
           <textarea
             value={input}

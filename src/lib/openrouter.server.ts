@@ -8,6 +8,16 @@ export const FREE_MODELS = [
 ] as const;
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-2.5-pro"] as const;
+
+/** Every model the studio can use, in default fallback order. */
+export const ALL_MODELS: string[] = [...GEMINI_MODELS, ...FREE_MODELS];
+
+function isGemini(model: string) {
+  return model.startsWith("gemini-");
+}
 
 export function openRouterKeys(): string[] {
   return [
@@ -62,17 +72,18 @@ async function openStream(
   body: RequestBody,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const response = await fetch(ENDPOINT, {
+  const gemini = isGemini(model);
+  const response = await fetch(gemini ? GEMINI_ENDPOINT : ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
-      "X-Title": "Telecraft",
+      ...(gemini ? {} : { "X-Title": "Telecraft" }),
     },
     body: JSON.stringify({
       model,
       stream: true,
-      reasoning: { enabled: true },
+      ...(gemini ? {} : { reasoning: { enabled: true } }),
       ...body,
     }),
     ...(signal ? { signal } : {}),
@@ -88,14 +99,19 @@ async function openStream(
 export async function* streamAssistantTurn(
   body: RequestBody,
   signal?: AbortSignal,
+  preferredModel?: string,
 ): AsyncGenerator<StreamEvent> {
   const keys = openRouterKeys();
-  if (!keys.length) throw new Error("Aucune clé OpenRouter configurée.");
+  const geminiKey = process.env["GEMINI_API_KEY"];
+  const order = preferredModel && ALL_MODELS.includes(preferredModel)
+    ? [preferredModel, ...ALL_MODELS.filter((m) => m !== preferredModel)]
+    : ALL_MODELS;
 
   let response: Response | undefined;
   let lastError = "IA indisponible.";
-  for (const model of FREE_MODELS) {
-    for (const key of keys) {
+  for (const model of order) {
+    const modelKeys = isGemini(model) ? (geminiKey ? [geminiKey] : []) : keys;
+    for (const key of modelKeys) {
       try {
         response = await openStream(model, key, body, signal);
         break;
@@ -142,7 +158,9 @@ export async function* streamAssistantTurn(
       if (delta.reasoning) yield { type: "reasoning", text: delta.reasoning };
       if (delta.content) yield { type: "text", text: delta.content };
       for (const call of delta.tool_calls ?? []) {
-        const index = call.index ?? 0;
+        const index =
+          call.index ??
+          ([...pending.entries()].find(([, c]) => call.id && c.id === call.id)?.[0] ?? pending.size);
         const current = pending.get(index) ?? { id: "", name: "", arguments: "" };
         pending.set(index, {
           id: call.id ?? current.id,
