@@ -208,8 +208,10 @@ export async function runBotUpdate(options: {
     const promiseHandle: QuickJSHandle = result.value;
     runtime.executePendingJobs();
 
+    const native = vm.resolvePromise(promiseHandle);
+    runtime.executePendingJobs();
     const settled = await Promise.race([
-      vm.resolvePromise(promiseHandle),
+      native,
       new Promise<"timeout">((r) => setTimeout(() => r("timeout"), TIMEOUT_MS)),
     ]);
     promiseHandle.dispose();
