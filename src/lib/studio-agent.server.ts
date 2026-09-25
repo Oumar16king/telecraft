@@ -90,6 +90,7 @@ type Ctx = {
   botId: string;
   message: string;
   signal?: AbortSignal;
+  model?: string;
 };
 
 export async function* runAgent(ctx: Ctx): AsyncGenerator<AgentEvent> {
@@ -185,6 +186,7 @@ ${files.length ? files.map((f) => `- ${f.path} (${f.content.length} caractères)
       for await (const event of streamAssistantTurn(
         { messages, tools: TOOLS, temperature: 0.3 },
         ctx.signal,
+        ctx.model,
       )) {
         if (event.type === "reasoning") {
           reasoning += event.text;
