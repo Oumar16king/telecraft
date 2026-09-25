@@ -275,9 +275,11 @@ function VibeChat({ botId }: { botId: string }) {
 
   const busy = !!live;
 
-  const [model, setModel] = useState<string>(() =>
-    typeof window === "undefined" ? MODEL_OPTIONS[0].id : localStorage.getItem("telecraft-model") ?? MODEL_OPTIONS[0].id,
-  );
+  const [model, setModel] = useState<string>(MODEL_OPTIONS[0]!.id);
+  useEffect(() => {
+    const saved = localStorage.getItem("telecraft-model");
+    if (saved && MODEL_OPTIONS.some((m) => m.id === saved)) setModel(saved);
+  }, []);
   const submit = async () => {
     const message = input.trim();
     if (!message || busy) return;
